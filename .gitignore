@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build output and tool caches
+dist/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# IDE settings
+.idea/
+.vscode/
+
+# Logs and temporary files
+*.log
+.tmp/
+.tmp-*/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local database exports
+*.dump
+*.sql.gz
+
+# Test artifacts
+playwright-report/
+test-results/
