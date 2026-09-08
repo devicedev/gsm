@@ -414,17 +414,19 @@ export function buildColumns(
           },
         ];
 
+  const engineHoursSection: ColumnDefinition = {
+    title: "Моточасы",
+    columns: [
+      summaryNumeric(getSummary, "engine_hours.one_c", "По 1С", (summary) => summary.engine_hours.one_c),
+      totalEngineHours,
+      summaryNumeric(getSummary, "engine_hours.difference", "Разность", (summary) => summary.engine_hours.difference, "engine_hours"),
+    ],
+  };
+
   return [
     ...common,
     ...measurementColumns,
-    {
-      title: "Моточасы",
-      columns: [
-        summaryNumeric(getSummary, "engine_hours.one_c", "По 1С", (summary) => summary.engine_hours.one_c),
-        totalEngineHours,
-        summaryNumeric(getSummary, "engine_hours.difference", "Разность", (summary) => summary.engine_hours.difference, "engine_hours"),
-      ],
-    },
+    ...(mode === "auto" ? [] : [engineHoursSection]),
     {
       title: "Заправлено",
       columns:
