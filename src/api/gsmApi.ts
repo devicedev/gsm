@@ -2,12 +2,29 @@ import type { GsmQuery, GsmReportResponse, GsmRowIdentity, GsmRowUpdate } from "
 
 async function readJson(response: Response): Promise<unknown> {
   const text = await response.text();
-  if (!text) return {};
+  if (!text) throw new Error("Сервер вернул пустой ответ");
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    return {};
+    throw new Error("Сервер вернул некорректный ответ. Обновите страницу и повторите попытку.");
   }
+}
+
+export interface CorrectionHistoryEntry {
+  id: number;
+  changed_at: string;
+  changed_by: string | null;
+  reason: string | null;
+  before_values: Record<string, unknown> | null;
+  after_values: Record<string, unknown>;
+}
+
+export async function fetchCorrectionHistory(identity: GsmRowIdentity): Promise<CorrectionHistoryEntry[]> {
+  const params = new URLSearchParams({ date: identity.date, equipment_number: identity.equipment_number });
+  const response = await fetch(`/api/gsm/v1/corrections/history?${params}`, { headers: { Accept: "application/json" } });
+  const payload = await readJson(response);
+  if (!response.ok) throw new Error(errorMessage(payload, "Не удалось загрузить историю"));
+  return (payload as { history: CorrectionHistoryEntry[] }).history;
 }
 
 function errorMessage(payload: unknown, fallback: string): string {

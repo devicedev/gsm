@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ColumnDefinition, Tabulator as TabulatorType } from "tabulator-tables";
 
-import type { GsmMode, GsmReportResponse, GsmRowIdentity, GsmRowUpdate } from "../../api/types";
+import type { CommonRow, GsmMode, GsmReportResponse, GsmRowIdentity, GsmRowUpdate } from "../../api/types";
 import { buildColumns } from "./columns";
 import {
   calculateLayoutViewportTop,
@@ -68,9 +68,10 @@ interface GsmTableProps {
   onUpdateError: (error: unknown) => void;
   onWaybillChange: (waybillNumber: string | null) => void;
   isFetching?: boolean;
+  onDetails: (row: CommonRow) => void;
 }
 
-export function GsmTable({ report, mode, onRowUpdate, onUpdateError, onWaybillChange, isFetching = false }: GsmTableProps) {
+export function GsmTable({ report, mode, onRowUpdate, onUpdateError, onWaybillChange, onDetails, isFetching = false }: GsmTableProps) {
   const tableElement = useRef<HTMLDivElement>(null);
   const tableInstance = useRef<TabulatorType | null>(null);
   const rowsRef = useRef(report.rows);
@@ -117,7 +118,7 @@ export function GsmTable({ report, mode, onRowUpdate, onUpdateError, onWaybillCh
     async function createTable() {
       const { TabulatorFull } = await tabulatorModulePromise;
       if (disposed || !tableElement.current) return;
-      const baseColumns = buildColumns(mode, onRowUpdate, onUpdateError, () => summaryRef.current) as ColumnDefinition[];
+      const baseColumns = buildColumns(mode, onRowUpdate, onUpdateError, () => summaryRef.current, onDetails) as ColumnDefinition[];
       const responsiveColumns = isNarrowViewport ? prioritizeNarrowColumns(baseColumns) : baseColumns;
       const columns = isCompactViewport
         ? [responsiveColumns[0], responsiveCollapseColumn, ...responsiveColumns.slice(1)]
@@ -173,7 +174,7 @@ export function GsmTable({ report, mode, onRowUpdate, onUpdateError, onWaybillCh
       tableInstance.current = null;
       onWaybillChange(null);
     };
-  }, [getTableHeight, isCompactViewport, isNarrowViewport, mode, onRowUpdate, onUpdateError, onWaybillChange]);
+  }, [getTableHeight, isCompactViewport, isNarrowViewport, mode, onRowUpdate, onUpdateError, onWaybillChange, onDetails]);
 
   useEffect(() => {
     if (!tableInstance.current) return;
@@ -185,7 +186,7 @@ export function GsmTable({ report, mode, onRowUpdate, onUpdateError, onWaybillCh
 
   return (
     <section className={`gsm-table-shell${isFetching ? " is-refreshing" : ""}`} aria-busy={isFetching} aria-label="Отчет ГСМ">
-      <div ref={tableElement} className="gsm-table" />
+      <div ref={tableElement} className="gsm-table" inert={isFetching} />
     </section>
   );
 }

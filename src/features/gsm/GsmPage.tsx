@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Fuel, Home, RefreshCw } from "lucide-react";
 
 import { fetchGsmReport, updateGsmCorrection } from "../../api/gsmApi";
-import type { GsmMode, GsmRowIdentity, GsmRowUpdate } from "../../api/types";
+import type { CommonRow, GsmMode, GsmRowIdentity, GsmRowUpdate } from "../../api/types";
+import { GsmRowDetails } from "./GsmRowDetails";
 import { GsmDateRangePicker } from "./GsmDateRangePicker";
 import { GsmSelect } from "./GsmSelect";
 import { GsmTable } from "./GsmTable";
@@ -15,6 +16,7 @@ function initialDates() {
 }
 
 export function GsmPage() {
+  const queryClient = useQueryClient();
   const pageRef = useRef<HTMLElement | null>(null);
   const toolbarRef = useRef<HTMLElement | null>(null);
   const initial = useMemo(initialDates, []);
@@ -25,6 +27,7 @@ export function GsmPage() {
   const [mode, setMode] = useState<GsmMode>("auto");
   const [editError, setEditError] = useState<string | null>(null);
   const [waybillNumber, setWaybillNumber] = useState<string | null>(null);
+  const [detailsRow, setDetailsRow] = useState<CommonRow | null>(null);
 
   const handleModeChange = useCallback((nextMode: GsmMode) => {
     setMode(nextMode);
@@ -46,9 +49,9 @@ export function GsmPage() {
     async (identity: GsmRowIdentity, update: GsmRowUpdate) => {
       setEditError(null);
       await updateGsmCorrection(identity, update);
-      await reportQuery.refetch();
+      await queryClient.invalidateQueries({ queryKey: ["gsm-report"] });
     },
-    [reportQuery.refetch],
+    [queryClient],
   );
 
   const handleUpdateError = useCallback((error: unknown) => {
@@ -196,6 +199,10 @@ export function GsmPage() {
       ) : null}
 
       {reportQuery.isLoading ? <div className="gsm-loading">Загружаем данные отчёта…</div> : null}
+      {report?.rows.some(row => row.matching?.status === "ambiguous") ? <div className="gsm-alert" role="alert">
+        Есть неоднозначные связи ГВ и 1С. Итоги ГВ неполные — требуется проверить соответствие техники.
+      </div> : null}
+      {detailsRow ? <GsmRowDetails row={detailsRow} onClose={() => setDetailsRow(null)} onUpdate={handleRowUpdate} /> : null}
       {report ? (
         <GsmTable
           key={report.mode}
@@ -205,6 +212,7 @@ export function GsmPage() {
           onUpdateError={handleUpdateError}
           onWaybillChange={handleWaybillChange}
           isFetching={reportQuery.isFetching}
+          onDetails={setDetailsRow}
         />
       ) : null}
     </main>

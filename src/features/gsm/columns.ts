@@ -1,9 +1,9 @@
 import type { CellComponent, ColumnDefinition, EmptyCallback, ValueBooleanCallback, ValueVoidCallback } from "tabulator-tables";
 
-import type { GsmInstrument, GsmMode, GsmRowIdentity, GsmRowUpdate, ReportSummary } from "../../api/types";
+import type { CommonRow, GsmInstrument, GsmMode, GsmRowIdentity, GsmRowUpdate, ReportSummary } from "../../api/types";
 
 function formatNumber(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "0";
+  if (value === null || value === undefined || value === "") return "—";
   const number = Number(value);
   if (!Number.isFinite(number)) return String(value);
   return number.toLocaleString("ru-RU", {
@@ -305,6 +305,7 @@ export function buildColumns(
   onRowUpdate: RowUpdateHandler,
   onUpdateError: UpdateErrorHandler,
   getSummary?: SummaryGetter,
+  onDetails?: (row: CommonRow) => void,
 ): ColumnDefinition[] {
   const editableEngineHours = editableMetricColumn(
     "engine_hours.gv",
@@ -371,7 +372,6 @@ export function buildColumns(
       widthGrow: 3.7,
       responsive: 0,
       headerWordWrap: true,
-      tooltip: true,
     },
     {
       title: "Прибор учета",
@@ -398,7 +398,7 @@ export function buildColumns(
             columns: [
               summaryNumeric(getSummary, "mileage.one_c", "По 1С", (summary) => summary.mileage?.one_c ?? null),
               summaryNumeric(getSummary, "mileage.gv_plus_3", "По GV+3%", (summary) => summary.mileage?.gv_plus_3 ?? null),
-              summaryNumeric(getSummary, "mileage.gv", "По GV", (summary) => summary.mileage?.gv ?? null),
+              withTopCalculation(editableMetricColumn("mileage.gv", "По GV", "пробег по GV", value => ({ mileage_gv: value }), onRowUpdate, onUpdateError), getSummary, summary => summary.mileage?.gv ?? null),
               summaryNumeric(getSummary, "mileage.difference", "Разность", (summary) => summary.mileage?.difference ?? null, "mileage"),
             ],
           },
@@ -446,16 +446,16 @@ export function buildColumns(
       title: "Списано",
       columns: [
         summaryNumeric(getSummary, "spent.one_c", "По 1С", (summary) => summary.spent.one_c),
-        summaryNumeric(getSummary, "spent.gv", "По GV", (summary) => summary.spent.gv),
+        withTopCalculation(editableMetricColumn("spent.gv", "По GV", "расход по GV", value => ({ spent_gv: value }), onRowUpdate, onUpdateError), getSummary, summary => summary.spent.gv),
         summaryNumeric(getSummary, "spent.difference", "Разность", (summary) => summary.spent.difference, "spent"),
       ],
     },
     {
       title: "Бак",
       columns: [
-        numeric("tank.balance_start", "Остаток<br>на начало<br>дня"),
+        editableMetricColumn("tank.balance_start", "Остаток<br>на начало<br>дня", "остаток на начало", value => ({ balance_start_gv: value }), onRowUpdate, onUpdateError),
         {
-          ...numeric("tank.balance_end", "Остаток<br>на конец<br>дня"),
+          ...editableMetricColumn("tank.balance_end", "Остаток<br>на конец<br>дня", "остаток на конец", value => ({ balance_end_gv: value }), onRowUpdate, onUpdateError),
           formatter: tankBalanceEndFormatter,
         },
         {

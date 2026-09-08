@@ -2,6 +2,9 @@ export type GsmMode = "auto" | "agri";
 export type GsmInstrument = "ДУТ" | "ДАРТ";
 
 export interface GsmRowUpdate {
+  reason?: string;
+  mileage_gv?: number;
+  reset_fields?: string[];
   instrument?: GsmInstrument;
   tank_capacity?: number;
   engine_hours_gv?: number;
@@ -32,6 +35,9 @@ export interface TankValues {
 }
 
 export interface CommonRow {
+  matching?: { status: "matched" | "ambiguous" | "one_c_only" | "gv_only"; sources: Array<Record<string, unknown>> };
+  corrections?: Record<string, number>;
+  source_values?: Record<string, number | null>;
   id: number | null;
   date: string | null;
   waybill_number: string | null;
