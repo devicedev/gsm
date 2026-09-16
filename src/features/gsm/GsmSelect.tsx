@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
 
 export interface GsmSelectOption {
@@ -20,6 +20,8 @@ export function GsmSelect({ label, value, placeholder, options, onChange }: GsmS
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const controlRef = useRef<HTMLDivElement>(null);
+  const optionsRef = useRef<HTMLDivElement>(null);
+  const selectedOptionRef = useRef<HTMLButtonElement>(null);
   const normalizedOptions = useMemo(
     () => options.map((option) => (typeof option === "string" ? { value: option, label: option } : option)),
     [options],
@@ -40,6 +42,12 @@ export function GsmSelect({ label, value, placeholder, options, onChange }: GsmS
   const selectedTitle = selectedOption?.merged
     ? `${selectedOption.label}: ${selectedOption.members?.join(", ") || "объединённое хозяйство"}`
     : value ? selectedLabel || value : placeholder;
+
+  useLayoutEffect(() => {
+    if (!open || !selectedOptionRef.current || !optionsRef.current) return;
+
+    selectedOptionRef.current.scrollIntoView({ block: "nearest" });
+  }, [filteredOptions, open, selectedOption, value]);
 
   useEffect(() => {
     if (!open) return;
@@ -63,6 +71,11 @@ export function GsmSelect({ label, value, placeholder, options, onChange }: GsmS
     setOpen(false);
   };
 
+  const toggleOpen = () => {
+    if (!open) setSearch("");
+    setOpen((current) => !current);
+  };
+
   return (
     <div className="gsm-custom-control" ref={controlRef}>
       <span className="gsm-control-label">{label}</span>
@@ -72,7 +85,7 @@ export function GsmSelect({ label, value, placeholder, options, onChange }: GsmS
         aria-haspopup="listbox"
         aria-expanded={open}
         title={selectedTitle}
-        onClick={() => setOpen((current) => !current)}
+        onClick={toggleOpen}
       >
         <span className={value ? "gsm-select-value" : "gsm-select-placeholder"}>
           <span className="gsm-select-value-text">{value ? selectedLabel || value : placeholder}</span>
@@ -93,13 +106,19 @@ export function GsmSelect({ label, value, placeholder, options, onChange }: GsmS
               onChange={(event) => setSearch(event.target.value)}
             />
           </div>
-          <div className="gsm-select-options">
-            <button className={`gsm-select-option${!value ? " is-selected" : ""}`} type="button" onClick={() => selectValue("")}>
+          <div className="gsm-select-options" ref={optionsRef}>
+            <button
+              ref={!value ? selectedOptionRef : undefined}
+              className={`gsm-select-option${!value ? " is-selected" : ""}`}
+              type="button"
+              onClick={() => selectValue("")}
+            >
               <span>{placeholder}</span>
               {!value ? <Check size={15} aria-hidden="true" /> : null}
             </button>
             {filteredOptions.map((option) => (
               <button
+                ref={value === option.value ? selectedOptionRef : undefined}
                 className={`gsm-select-option${value === option.value ? " is-selected" : ""}${option.merged ? " is-merged" : ""}`}
                 key={option.value}
                 type="button"

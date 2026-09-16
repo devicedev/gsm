@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Fuel, Home, RefreshCw } from "lucide-react";
+import { AlertTriangle, Home, RefreshCw } from "lucide-react";
 
 import { fetchGsmReport, updateGsmCorrection } from "../../api/gsmApi";
 import type { CommonRow, GsmMode, GsmRowIdentity, GsmRowUpdate } from "../../api/types";
@@ -15,16 +15,73 @@ function initialDates() {
   return lastSevenDays(new Date());
 }
 
+interface GsmFilterState {
+  dateFrom: string;
+  dateTo: string;
+  farm: string;
+  technic: string;
+  mode: GsmMode;
+}
+
+function isValidIsoDate(value: string | null): value is string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(year, month - 1, day);
+  return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day;
+}
+
+function readFilterState(): GsmFilterState {
+  const fallback = initialDates();
+  if (typeof window === "undefined") {
+    return { dateFrom: fallback.from, dateTo: fallback.to, farm: "", technic: "", mode: "auto" };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const fromValue = params.get("from");
+  const toValue = params.get("to");
+  const from = isValidIsoDate(fromValue) ? fromValue : fallback.from;
+  const to = isValidIsoDate(toValue) ? toValue : fallback.to;
+
+  return {
+    dateFrom: from <= to ? from : to,
+    dateTo: from <= to ? to : from,
+    farm: params.get("farm") || "",
+    technic: params.get("technic") || "",
+    mode: params.get("mode") === "agri" ? "agri" : "auto",
+  };
+}
+
+function syncFilterStateToUrl(state: GsmFilterState, replace = false) {
+  if (typeof window === "undefined") return;
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("from", state.dateFrom);
+  url.searchParams.set("to", state.dateTo);
+  url.searchParams.set("mode", state.mode);
+  if (state.farm) url.searchParams.set("farm", state.farm);
+  else url.searchParams.delete("farm");
+  if (state.technic) url.searchParams.set("technic", state.technic);
+  else url.searchParams.delete("technic");
+
+  const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+  const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (nextUrl === currentUrl) return;
+  if (replace) window.history.replaceState(window.history.state, "", nextUrl);
+  else window.history.pushState(window.history.state, "", nextUrl);
+}
+
 export function GsmPage() {
   const queryClient = useQueryClient();
   const pageRef = useRef<HTMLElement | null>(null);
   const toolbarRef = useRef<HTMLElement | null>(null);
-  const initial = useMemo(initialDates, []);
-  const [dateFrom, setDateFrom] = useState(initial.from);
-  const [dateTo, setDateTo] = useState(initial.to);
-  const [farm, setFarm] = useState("");
-  const [technic, setTechnic] = useState("");
-  const [mode, setMode] = useState<GsmMode>("auto");
+  const [initial] = useState<GsmFilterState>(readFilterState);
+  const replaceNextUrlRef = useRef(true);
+  const [dateFrom, setDateFrom] = useState(initial.dateFrom);
+  const [dateTo, setDateTo] = useState(initial.dateTo);
+  const [farm, setFarm] = useState(initial.farm);
+  const [technic, setTechnic] = useState(initial.technic);
+  const [mode, setMode] = useState<GsmMode>(initial.mode);
   const [editError, setEditError] = useState<string | null>(null);
   const [waybillNumber, setWaybillNumber] = useState<string | null>(null);
   const [detailsRow, setDetailsRow] = useState<CommonRow | null>(null);
@@ -44,6 +101,27 @@ export function GsmPage() {
   const report = reportQuery.data;
   const waybillNumbers = splitWaybillNumbers(waybillNumber);
   const hasWaybills = waybillNumbers.length > 0;
+
+  useEffect(() => {
+    const replace = replaceNextUrlRef.current;
+    replaceNextUrlRef.current = false;
+    syncFilterStateToUrl({ dateFrom, dateTo, farm, technic, mode }, replace);
+  }, [dateFrom, dateTo, farm, technic, mode]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      replaceNextUrlRef.current = true;
+      const next = readFilterState();
+      setDateFrom(next.dateFrom);
+      setDateTo(next.dateTo);
+      setFarm(next.farm);
+      setTechnic(next.technic);
+      setMode(next.mode);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   const handleRowUpdate = useCallback(
     async (identity: GsmRowIdentity, update: GsmRowUpdate) => {
@@ -80,38 +158,12 @@ export function GsmPage() {
 
   return (
     <main ref={pageRef} className="gsm-page">
-      <header className="gsm-header">
-        <div className="gsm-header-copy">
-          <div className="gsm-brandline">
-            <span className="gsm-brand-mark" aria-hidden="true">
-              <Fuel size={18} strokeWidth={2.2} />
-            </span>
-            <p className="gsm-kicker">Операционный контроль</p>
-          </div>
-          <h1>
-            ГСМ <span className="gsm-title-accent">·</span> техника
-          </h1>
-        </div>
-        <div className="gsm-header-visual" aria-hidden="true">
-          <span className="gsm-visual-grid" />
-          <span className="gsm-visual-orbit gsm-visual-orbit-one" />
-          <span className="gsm-visual-orbit gsm-visual-orbit-two" />
-          <span className="gsm-visual-core">
-            <Fuel size={25} strokeWidth={1.8} />
-          </span>
-          <span className="gsm-visual-dot gsm-visual-dot-one" />
-          <span className="gsm-visual-dot gsm-visual-dot-two" />
-          <span className="gsm-visual-bars">
-            <i />
-            <i />
-            <i />
-            <i />
-            <i />
-          </span>
-        </div>
-      </header>
-
       <section ref={toolbarRef} className="gsm-toolbar" aria-label="Фильтры отчета">
+        <h1 className="gsm-toolbar-title">ГСМ <span className="gsm-title-accent">·</span> техника</h1>
+        <a className="gsm-home-button" href={import.meta.env.PROD ? "/hub" : "http://10.90.25.243:5000/hub"}>
+          <Home size={16} aria-hidden="true" />
+          Главная
+        </a>
         <GsmDateRangePicker from={dateFrom} to={dateTo} onChange={(from, to) => {
           setDateFrom(from);
           setDateTo(to);
@@ -144,15 +196,6 @@ export function GsmPage() {
           </div>
         </fieldset>
         <div className={`gsm-toolbar-actions${hasWaybills ? " has-waybills" : ""}`} aria-label="Действия">
-          <a
-            className={`gsm-home-button${hasWaybills ? " is-hidden" : ""}`}
-            href="http://10.90.25.243:5000/hub"
-            aria-hidden={hasWaybills}
-            tabIndex={hasWaybills ? -1 : 0}
-          >
-            <Home size={16} aria-hidden="true" />
-            Главная
-          </a>
           <div className={`gsm-toolbar-waybill-swap${hasWaybills ? " is-hidden" : ""}`} aria-hidden={hasWaybills}>
             <button
               className="gsm-refresh-button"
