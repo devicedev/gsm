@@ -179,9 +179,19 @@ export function GsmTable({ report, mode, onRowUpdate, onUpdateError, onWaybillCh
   useEffect(() => {
     if (!tableInstance.current) return;
     const table = tableInstance.current;
+    const holder = tableElement.current?.querySelector<HTMLElement>(".tabulator-tableholder");
+    const scrollTop = holder?.scrollTop ?? 0;
+    const scrollLeft = holder?.scrollLeft ?? 0;
+    let cancelled = false;
     void table.replaceData(report.rows).then(() => {
-      if (tableInstance.current === table) table.setHeight(getTableHeight(report.rows.length));
+      if (cancelled || tableInstance.current !== table) return;
+      const height = getTableHeight(report.rows.length);
+      // setHeight forces a full redraw and resets the scroll preserved by replaceData.
+      if (tableElement.current?.style.height !== `${height}px`) table.setHeight(height);
+      // Virtual rendering may also shift the row offset during replaceData.
+      holder?.scrollTo({ top: scrollTop, left: scrollLeft, behavior: "instant" });
     });
+    return () => { cancelled = true; };
   }, [getTableHeight, report.rows]);
 
   return (
