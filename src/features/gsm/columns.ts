@@ -239,9 +239,9 @@ function saveCell(
 ) {
   const identity = rowIdentity(cell);
   if (identity === null) return;
-  const previousValue = cell.getOldValue();
   void onRowUpdate(identity, update).catch((error: unknown) => {
-    cell.setValue(previousValue, true);
+    // Roll back without firing cellEdited and issuing another PATCH.
+    cell.restoreOldValue();
     cell.getRow().reformat();
     onUpdateError(error);
   });
